@@ -1,0 +1,67 @@
+/* The Finite Element Method for One Crack */
+
+/* Initial Crack */
+func xi = exp(-(y / 0.1)^2) * (1 + exp((x + 0.5) / 0.1))^(-1);
+int n = 50;
+int iter = 100;
+real alpha2 = 0.001;
+real dt = 0.01;
+real gamma = 0.5;
+real epsilon = 0.001;
+
+border G1(t = 0, 2){
+   x = -1 + t;
+   y = -1;
+}
+
+border G2(t = 0, 2){
+   x = 1;
+   y = -1 + t;
+}
+
+border G3(t = 0, 2){
+   x = 1 - t;
+   y = 1;
+}
+
+border G4(t = 0, 2){
+   x = -1;
+   y = 1 - t;
+}
+
+mesh Th = buildmesh (G1(n) + G2(n) + G3(n) + G4(n));
+fespace Vh(Th , P1 );
+Vh u, z, v1 , v2 , z0 , g, u0;
+z0 = xi;
+u0 = 0;
+
+for(int i = 0; i < iter; i++){
+/* Dirichlet Boundary Condition */
+g = - 10 * y * (i + 1) * dt;
+/* Solve u */
+solve displacement (u, v1) = int2d(Th)(dx(v1) * (1 - z0) * (1 - z0) * dx(u)
+   + dy(v1) * (1 - z0) * (1 - z0) * dy(u))
+   + on(G1 , G3 , u = g);
+/* Solve z */
+solve phase (z, v2) = int2d (Th)(v2 * alpha2 / dt * z
+   + epsilon * (dx(z) * dx(v2) + dy(z) * dy(v2 ))
+   + gamma^2 / epsilon * v2 * z
+   + v2 * (dx(u)*dx(u) + dy(u)* dy(u)) * z)
+   - int2d(Th)(v2 * alpha2 / dt * z0)
+   - int2d (Th)(v2 * (dx(u)*dx(u) + dy(u)* dy(u)));
+
+for(int j = 0; j < Th.nt; j++){
+   for(int k = 0; k < 3; k++){
+      if(z0 [][ Vh(j, k)] > z[][ Vh(j, k)]){
+         z[][ Vh(j, k)] = z0 [][ Vh(j, k)];
+      }
+   }
+}
+
+/* Output of DATA */
+if(i<10) plot(z,ps="Crack_z0"+i+".eps");
+else plot(z,ps="Crack_z" +i+".eps");
+
+u0 = u;
+z0 = z;
+}
